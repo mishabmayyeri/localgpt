@@ -19,7 +19,7 @@ Before you begin, ensure you have the following installed on your system:
 
 1. Clone this repository:
    ```sh
-   git clone https://github.com/yourusername/localgpt.git
+   git clone https://github.com/mishabmayyeri/localgpt.git
    cd localgpt
    ```
 2. Install dependencies:
