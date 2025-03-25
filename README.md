@@ -32,10 +32,10 @@ Before you begin, ensure you have the following installed on your system:
 
 ## Configuration
 
-Currently, the model name is hardcoded in the code. To change the model, locate the API handler file (e.g., `pages/api/chat.js` or `app/api/chat.js` in your Next.js app) and update the model name:
+Currently, the model name is hardcoded in the code. To change the model, locate the API handler file `app/api/chat/route.ts` in your Next.js app and update the model name:
 
 ```javascript
-const modelName = "mistral"; // Change this to your installed model name
+ model: 'llama3.1:8b', // Change this to your installed model name, you can check it by running ollama list which will list all your installed models
 ```
 
 In future versions, a UI-based selection or environment variable configuration may be added.
