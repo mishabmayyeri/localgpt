@@ -26,6 +26,7 @@ export default function ChatInterface() {
     const [chats, setChats] = useState<Chat[]>([]);
     const [currentChatId, setCurrentChatId] = useState<string | null>(null);
     const messagesEndRef = useRef<HTMLDivElement>(null);
+    const textareaRef = useRef<HTMLTextAreaElement>(null);
 
     // Load chats from localStorage on initial render
     useEffect(() => {
@@ -90,6 +91,23 @@ export default function ChatInterface() {
     }, [chats]);
 
     const currentChat = chats.find(chat => chat.id === currentChatId);
+
+    // Adjust textarea height dynamically
+    const handleInputChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+        setInput(e.target.value);
+
+        // Adjust textarea height
+        const textarea = e.target;
+        textarea.style.height = 'auto';
+        textarea.style.height = `${Math.min(textarea.scrollHeight, 150)}px`;
+    };
+
+    // Handle submit on Ctrl+Enter
+    const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+        if (e.key === 'Enter' && e.ctrlKey) {
+            handleSubmit(e as any);
+        }
+    };
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -273,18 +291,66 @@ export default function ChatInterface() {
         }
     };
 
+
+    // Enhanced code detection and extraction
+    const extractCodeBlocks = (content: string) => {
+        const codeRegex = /```(\w+)?\n([\s\S]*?)```/g;
+        const matches = [];
+        let nonCodeContent = content;
+        let match;
+
+        while ((match = codeRegex.exec(content)) !== null) {
+            const [fullMatch, language, code] = match;
+            const index = content.indexOf(fullMatch);
+
+            // Extract non-code content before the code block
+            const beforeCode = content.slice(0, index);
+            matches.push({ type: 'text', content: beforeCode });
+
+            // Extract code block
+            matches.push({
+                type: 'code',
+                language: language || guessLanguage(code),
+                content: code.trim()
+            });
+
+            // Update non-code content
+            nonCodeContent = content.slice(index + fullMatch.length);
+        }
+
+        // Add any remaining non-code content
+        if (nonCodeContent.trim()) {
+            matches.push({ type: 'text', content: nonCodeContent });
+        }
+
+        return matches.length ? matches : [{ type: 'text', content }];
+    };
+
     return (
-        <div className="flex h-screen bg-gray-100">
+        <div className="flex h-screen bg-gray-900 text-gray-100">
             {/* Sidebar */}
-            <div className="w-64 bg-gray-800 text-white p-4 flex flex-col">
-                <button onClick={createNewChat} className="mb-4 bg-blue-600 hover:bg-blue-700 text-white py-2 px-4 rounded">
+            <div className="w-64 bg-gray-950 text-gray-300 p-4 flex flex-col border-r border-gray-800">
+                <button
+                    onClick={createNewChat}
+                    className="mb-4 bg-blue-700 hover:bg-blue-800 text-white py-2 px-4 rounded transition-colors duration-200"
+                >
                     New Chat
                 </button>
                 <div className="flex-1 overflow-y-auto">
                     {chats.map(chat => (
-                        <div key={chat.id} className={`p-2 mb-2 rounded cursor-pointer flex justify-between items-center ${chat.id === currentChatId ? 'bg-gray-700' : 'hover:bg-gray-700'}`} onClick={() => setCurrentChatId(chat.id)}>
+                        <div
+                            key={chat.id}
+                            className={`p-2 mb-2 rounded cursor-pointer flex justify-between items-center 
+                                ${chat.id === currentChatId
+                                    ? 'bg-gray-800 text-white'
+                                    : 'hover:bg-gray-800 text-gray-400 hover:text-white'}`}
+                            onClick={() => setCurrentChatId(chat.id)}
+                        >
                             <div className="truncate flex-1">{chat.title}</div>
-                            <button onClick={(e) => deleteChat(chat.id, e)} className="text-gray-400 hover:text-red-500">
+                            <button
+                                onClick={(e) => deleteChat(chat.id, e)}
+                                className="text-gray-500 hover:text-red-500 transition-colors duration-200"
+                            >
                                 ×
                             </button>
                         </div>
@@ -294,24 +360,44 @@ export default function ChatInterface() {
             {/* Main Chat Area */}
             <div className="flex-1 flex flex-col">
                 {/* Chat Messages */}
-                <div className="flex-1 overflow-y-auto p-4 bg-white">
+                <div className="flex-1 overflow-y-auto p-4 bg-gray-900">
                     {currentChat?.messages.map(message => (
-                        <div key={message.id} className={`mb-4 ${message.role === 'user' ? 'text-right' : 'text-left'}`}>
-                            <div className={`inline-block max-w-3xl p-3 rounded-lg ${message.role === 'user' ? 'bg-blue-100 text-blue-900' : 'bg-gray-100 text-gray-900'}`}>
+                        <div
+                            key={message.id}
+                            className={`mb-4 ${message.role === 'user' ? 'text-right' : 'text-left'}`}
+                        >
+                            <div
+                                className={`inline-block max-w-3xl p-3 rounded-lg 
+                                    ${message.role === 'user'
+                                        ? 'bg-blue-800 text-blue-100'
+                                        : 'bg-gray-800 text-gray-100'} relative
+                                    overflow-x-auto whitespace-pre-wrap break-words`}
+                            >
                                 <div className="font-bold mb-1">
                                     {message.role === 'user' ? 'You' : 'AI'}
                                     {message.isStreaming && <span className="ml-2 animate-pulse">...</span>}
                                 </div>
-                                <div className="prose max-w-none text-left">
-                                    {isCode(message.content) ? (
-                                        <pre>
-                                            <code className={`language-${guessLanguage(message.content)}`}>
-                                                {message.content}
-                                            </code>
-                                        </pre>
-                                    ) : (
-                                        <ReactMarkdown>{message.content}</ReactMarkdown>
-                                    )}
+
+                                {/* Render message content with separate code blocks */}
+                                <div className="prose prose-invert max-w-none text-left">
+                                    {extractCodeBlocks(message.content).map((block, index) => (
+                                        <React.Fragment key={index}>
+                                            {block.type === 'text' ? (
+                                                <ReactMarkdown>{block.content}</ReactMarkdown>
+                                            ) : (
+                                                <div className="my-2 bg-gray-900 rounded-md overflow-x-auto">
+                                                    <div className="px-4 py-2 bg-gray-800 text-gray-400 text-sm">
+                                                        {block.language}
+                                                    </div>
+                                                    <pre className="p-4 text-sm overflow-x-auto">
+                                                        <code className={`language-${block.language}`}>
+                                                            {block.content}
+                                                        </code>
+                                                    </pre>
+                                                </div>
+                                            )}
+                                        </React.Fragment>
+                                    ))}
                                 </div>
                                 <div className="text-xs text-gray-500 mt-1">
                                     {new Date(message.timestamp).toLocaleTimeString()}
@@ -321,12 +407,41 @@ export default function ChatInterface() {
                     ))}
                     <div ref={messagesEndRef} />
                 </div>
-                {/* Input Form with improved visibility */}
-                <div className="p-4 border-t bg-white shadow-md">
-                    <form onSubmit={handleSubmit} className="flex">
-                        <input type="text" value={input} onChange={(e) => setInput(e.target.value)} placeholder="Type your message..." className="flex-1 p-3 border-2 border-gray-300 rounded-l focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-gray-900 text-base font-medium bg-white" disabled={isLoading} />
-                        <button type="submit" disabled={isLoading || !input.trim()} className="bg-blue-600 hover:bg-blue-700 text-white py-3 px-6 rounded-r font-medium">
-                            {isLoading ? 'Sending...' : 'Send'}
+                {/* Input Form with Multiline Textarea */}
+                <div className="p-4 border-t border-gray-800 bg-gray-900 shadow-md">
+                    <form onSubmit={handleSubmit} className="flex items-end relative">
+                        <textarea
+                            ref={textareaRef}
+                            value={input}
+                            onChange={handleInputChange}
+                            onKeyDown={handleKeyDown}
+                            placeholder="Type your message... (Ctrl+Enter to send)"
+                            className="flex-1 p-3 pr-12 border-2 border-gray-700 rounded-l focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-blue-600 
+                                text-gray-100 text-base font-medium bg-gray-800 resize-none max-h-48 
+                                placeholder-gray-500 scrollbar-hide"
+                            rows={1}
+                            disabled={isLoading}
+                        />
+                        <button
+                            type="submit"
+                            disabled={isLoading || !input.trim()}
+                            className="absolute right-4 top-1/2 -translate-y-1/2 
+                                text-gray-400 hover:text-white 
+                                disabled:opacity-50 disabled:cursor-not-allowed 
+                                transition-colors duration-200"
+                        >
+                            <svg xmlns="http://www.w3.org/2000/svg"
+                                viewBox="0 0 24 24"
+                                fill="none"
+                                stroke="currentColor"
+                                strokeWidth="2"
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                className="w-6 h-6"
+                            >
+                                <line x1="22" y1="2" x2="11" y2="13"></line>
+                                <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
+                            </svg>
                         </button>
                     </form>
                 </div>
@@ -334,17 +449,14 @@ export default function ChatInterface() {
         </div>
     );
 
-    // Helper function to determine if a message is code
-    function isCode(content: string) {
-        return content.includes('`') || /<code/.test(content);
-    }
-
-    // Helper function to guess the language of the code snippet
+    // Helper function to guess code language
     function guessLanguage(content: string) {
         // Simple heuristic based on common language markers
-        if (content.includes('<')) return 'html';
-        if (content.includes('{')) return 'javascript';
-        if (content.includes('[')) return 'json';
-        return 'plaintext'; // Default to plaintext if no clear indicators
+        if (content.includes('def ') || content.includes('import ')) return 'python';
+        if (content.includes('function ') || content.includes('const ')) return 'javascript';
+        if (content.includes('public class ')) return 'java';
+        if (content.includes('<?php')) return 'php';
+        if (content.includes('```')) return 'markdown';
+        return 'plaintext';
     }
 }
